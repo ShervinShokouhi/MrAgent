@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SnakeGame3D</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: sans-serif;
+        }
+        canvas {
+            border: 1px solid #fff;
+        }
+        #footer {
+          position: fixed;
+          bottom: 10px;
+          left: 50%;
+          transform: translateX(-50%);
+          color: white;
+          font-size: 0.8em;
+        }
+    </style>
+    <!-- Include three.js from CDNJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="footer">MrAgent - Shokouhi Ltd 2025</div>
+
+    <script>
+        // Wait for resources to load
+        window.addEventListener('load', () => {
+          init();
+        });
+
+        let scene, camera, renderer, cube, textureCanvas, textureContext, texture;
+        let snake = [];
+        let fruit = {};
+        let gridSize = 20;
+        let cellSize = 1;
+        let cubeSize = gridSize * cellSize;
+        let direction = { x: 1, y: 0 };  // Initial direction (right)
+        let nextMove = null; // Store the A* result
+        let gameSpeed = 150; // Milliseconds per snake move.  Adjust for gameplay speed.
+        let lastMoveTime = 0;  // Track when the snake last moved
+        let isGameActive = true; // Flag to pause game
+
+        function init() {
+
+            // Setup Three.js scene
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 30;
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+            renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+            //document.body.appendChild(renderer.domElement); Removed, since we use the canvas directly
+
+            // Create a canvas for the snake game texture
+            textureCanvas = document.createElement('canvas');
+            textureCanvas.width = 256; // Power of 2 for textures
+            textureCanvas.height = 256;
+            textureContext = textureCanvas.getContext('2d');
+
+            // Create the cube
+            const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+            texture = new THREE.CanvasTexture(textureCanvas);
+             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+            cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
+
+
+            // Initialize snake and fruit
+            resetGame();
+
+            // Start the animation loop
+            animate();
+
+            //Offline support
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('sw.js')  // Create an empty sw.js in your directory.
+              .then(() => console.log('Service Worker Registered'))
+              .catch (err => console.warn('SW registration failed:', err));
+            }
+        }
+    function resetGame() {
+          snake = [{ x: Math.floor(gridSize / 2), y: Math.floor(gridSize / 2) }];
+          placeFruit();
+          nextMove = null;
+          direction = {x:1, y:0};
+          isGameActive = true;
+    }
+
+        function placeFruit() {
+            do {
+                fruit = { x: Math.floor(Math.random() * gridSize), y: Math.floor(Math.random() * gridSize) };
+            } while (snake.some(segment => segment.x === fruit.x && segment.y === fruit.y));
+        }
+
+
+      function aStar(start, goal) {
+          const openSet = [start];
+          const cameFrom = {};
+
+          const gScore = {};
+          gScore[`${start.x},${start.y}`] = 0;
+
+          const fScore = {};
+          fScore[`${start.x},${start.y}`] = heuristic(start, goal);
+
+          while (openSet.length > 0) {
+              let current = openSet.reduce((a, b) => fScore[`${a.x},${a.y}`] < fScore[`${b.x},${b.y}`] ? a : b);
+
+              if (current.x === goal.x && current.y === goal.y) {
+                  return reconstructPath(cameFrom, current);
+              }
+
+              openSet.splice(openSet.indexOf(current), 1);
+
+            const neighbors = getNeighbors(current);
+
+            for (const neighbor of neighbors) {
+
+                const tentativeGScore = gScore[`${current.x},${current.y}`] + 1;
+
+              const neighborKey = `${neighbor.x},${neighbor.y}`;
+
+              if (!(neighborKey in gScore) || tentativeGScore < gScore[neighborKey]) {
+
+                  cameFrom[neighborKey] = current;
+                  gScore[neighborKey] = tentativeGScore;
+                  fScore[neighborKey] = tentativeGScore + heuristic(neighbor, goal);
+                   if (!openSet.some(n => n.x === neighbor.x && n.y === neighbor.y)) {
+                      openSet.push(neighbor);
+              }
+                }
+            }
+          }
+
+          return null; // No path found
+        }
+
+      function heuristic(a, b) {
+        // Manhattan distance
+        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+      }
+      function getNeighbors(node) {
+          const neighbors = [];
+          const potentialNeighbors = [
+               {x: node.x + 1, y: node.y}, {x: node.x - 1, y: node.y},
+               {x: node.x, y: node.y + 1}, {x: node.x, y: node.y - 1},
+          ];
+
+          for (let neighbor of potentialNeighbors) {
+             //Wrap-around logic.
+             neighbor.x = (neighbor.x + gridSize) % gridSize;
+             neighbor.y = (neighbor.y + gridSize) % gridSize;
+
+             neighbors.push(neighbor);
+          }
+
+        return neighbors;
+      }
+
+
+    function reconstructPath(cameFrom, current) {
+          const path = [current];
+        while (`${current.x},${current.y}` in cameFrom) {
+          current = cameFrom[`${current.x},${current.y}`];
+              path.unshift(current); // Add to the beginning
+        }
+          return path;
+    }
+
+
+    function updateSnake() {
+      if (!isGameActive) return;
+
+       const now = Date.now();
+         if (now - lastMoveTime < gameSpeed) {
+           return; // Too soon to move
+          }
+      lastMoveTime = now;
+
+
+      if (!nextMove) {
+                const path = aStar(snake[0], fruit);
+              if (path && path.length > 1) {
+                  nextMove = path[1]; // The next step after the current head
+              }
+      }
+
+       if (nextMove) {
+            // Calculate direction based on nextMove
+          direction.x = nextMove.x - snake[0].x;
+          direction.y = nextMove.y - snake[0].y;
+
+           //Wrap-around logic:
+           if (direction.x > 1) direction.x = -gridSize +1;
+           if (direction.x < -1) direction.x = gridSize -1;
+           if (direction.y > 1) direction.y = -gridSize + 1;
+           if (direction.y < -1) direction.y = gridSize -1;
+
+           nextMove = null; // consumed.
+        }
+
+            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+            // Wrap around
+            head.x = (head.x + gridSize) % gridSize;
+            head.y = (head.y + gridSize) % gridSize;
+
+
+            snake.unshift(head); // Add new head
+
+            if (head.x === fruit.x && head.y === fruit.y) {
+                placeFruit(); // Grow the snake and place a new fruit
+            } else {
+                snake.pop(); // Remove tail if no fruit eaten
+            }
+
+        }
+
+        function drawGame() {
+            // Clear the texture canvas
+            textureContext.clearRect(0, 0, textureCanvas.width, textureCanvas.height);
+            textureContext.fillStyle = '#111'; // Dark background for off-grid
+            textureContext.fillRect(0, 0, textureCanvas.width, textureCanvas.height);
+            // Draw the grid with slight padding
+            const padding = 2; // Small padding
+            const drawCellSize = (textureCanvas.width - padding * (gridSize + 1)) / gridSize;
+
+            textureContext.fillStyle = '#333'; // Grid color
+            for (let x = 0; x < gridSize; x++) {
+                for (let y = 0; y < gridSize; y++) {
+                     textureContext.fillRect(
+                       padding + x * (drawCellSize + padding), // Include padding in x calculation
+                       padding + y * (drawCellSize + padding), // Include padding in y calculation
+                        drawCellSize,
+                        drawCellSize
+                    );
+                }
+            }
+
+            // Draw the snake
+             const snakeGradient = textureContext.createLinearGradient(0, 0, drawCellSize, drawCellSize);
+            snakeGradient.addColorStop(0, 'lime');
+            snakeGradient.addColorStop(1, 'green');
+            textureContext.fillStyle = snakeGradient;
+           for (const segment of snake) {
+                textureContext.fillRect(
+                  padding + segment.x * (drawCellSize + padding),  //Include padding
+                  padding + segment.y * (drawCellSize + padding),   //Include padding
+                  drawCellSize,
+                  drawCellSize
+                );
+            }
+
+            // Draw the fruit
+            const fruitGradient = textureContext.createLinearGradient(0, 0, drawCellSize, drawCellSize);
+              fruitGradient.addColorStop(0, 'red');
+              fruitGradient.addColorStop(1, 'darkred');
+              textureContext.fillStyle = fruitGradient;
+            textureContext.fillRect(
+              padding + fruit.x * (drawCellSize + padding),  //Include padding
+              padding + fruit.y * (drawCellSize + padding),   //Include padding
+              drawCellSize,
+              drawCellSize
+            );
+            texture.needsUpdate = true;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            updateSnake();
+            drawGame();
+
+            // Rotate the cube
+            cube.rotation.x += 0.005;
+            cube.rotation.y += 0.005;
+
+            renderer.render(scene, camera);
+        }
+
+        //Handle window resize
+        window.addEventListener('resize', () => {
+          camera.aspect = window.innerWidth * 0.8 / window.innerHeight * 0.8;
+            camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth * 0.8, window.innerHeight* 0.8);
+        });
+    </script>
+</body>
+</html>
+        <script>
+            (function() {
+                const originalConsoleError = console.error;
+                console.error = function(...args) {
+                    window.parent.postMessage({
+                        type: 'consoleError',
+                        error: args.join(' ')
+                    }, '*');
+                    originalConsoleError.apply(console, args);
+                };
+
+                window.addEventListener('error', (event) => {
+                    window.parent.postMessage({
+                        type: 'consoleError',
+                        error: event.message || 'Unknown error'
+                    }, '*');
+                });
+
+                // Signal when script is ready
+                window.parent.postMessage({ type: 'scriptLoaded' }, '*');
+            })();
+        </script>
