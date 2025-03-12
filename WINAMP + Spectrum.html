@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicPlayerX</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow-x: hidden; /* Prevent horizontal scrollbar */
+        }
+
+        #player-container {
+            width: 80%;  /* Responsive width */
+            max-width: 600px; /* Limit maximum width */
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            box-sizing: border-box;  /* Include padding in width */
+        }
+
+
+        #controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;  /* Distribute controls evenly */
+            margin-bottom: 15px;
+        }
+
+        #controls button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            color: #ffffff;
+        }
+
+        #controls button:hover {
+            color: #1db954;
+        }
+      
+           #progress-container {
+        display:flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 99%;
+       }
+
+        #progress-bar {
+            width: 70%;
+            height: 8px;
+            background-color: #535353;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 10px 0 5px;
+        }
+
+        #progress {
+            height: 100%;
+            width: 0;
+            background-color: #1db954;
+            border-radius: 4px;
+        }
+
+        #track-info {
+           display:flex;
+           width:100%;
+           align-items: start;
+           justify-content: space-between;
+           padding:5px;
+        }
+        #track-info #time{
+            text-align: right;
+         }
+
+
+        #volume-container {
+            display: flex;
+            align-items: center;
+        }
+
+        #volume-slider {
+            width: 80px;
+            height: 8px;
+            background-color: #535353;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+
+        .volume-bar {
+            height: 100%;
+            width: 100%;
+            background-color: #1db954;
+            border-radius: 4px;
+
+        }
+
+        #playlist-container {
+            margin-top: 20px;
+        }
+
+        #playlist {
+            list-style: none;
+            padding: 0;
+            
+        }
+
+        #playlist li {
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+        }
+
+        #playlist li:hover {
+            background-color: #333;
+        }
+
+        #playlist li.active {
+            background-color: #1db954;
+            color: #121212;
+        }
+
+        #visualizer-container {
+            width: 100%;
+            height: 150px;
+            margin-top: 20px;
+      			display: flex; /* Use flexbox */
+      			align-items: flex-end; /* Align bars at the bottom */
+      			justify-content: space-around; /* Space the bars */
+        }
+
+        .bar {
+            width: 5px;
+            height: 0;
+            background-color: #1db954; /* Bar Color */
+            transition: height 0.1s ease; /* Animate the height change */
+        }
+
+        /* Dark/Light Mode Toggle */
+        #theme-toggle-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        #theme-toggle {
+            cursor: pointer;
+          background-color: transparent;
+          border: none;
+          font-size: 1.2rem;
+        }
+      
+        #file-input-container {
+          margin-bottom: 10px;
+          padding: 10px;
+          width:100%;
+         
+        }
+
+        .light-mode {
+            background-color: #ffffff;
+            color: #121212;
+        }
+
+       .light-mode #player-container {
+          background-color: #f0f0f0;
+          box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .light-mode  #controls button,
+        .light-mode  #file-input,
+        .light-mode #theme-toggle{
+          color: #121212;
+        }
+
+        .light-mode  #playlist li {
+           border-bottom: 1px solid #ccc;
+         }
+
+        .light-mode  #playlist li:hover{
+          background-color: #ddd;
+        }
+         .light-mode .bar {
+           background-color: #0a742e;
+         }
+
+        /* Footer */
+        footer {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .hidden {
+          display: none;
+        }
+       /* Icons (using spans for simplicity) */
+        .icon-play::before { content: "▶"; }
+        .icon-pause::before { content: "⏸"; }
+        .icon-stop::before { content: "⏹"; }
+        .icon-next::before { content: "⏭"; }
+        .icon-prev::before { content: "⏮"; }
+   </style>
+</head>
+<body>
+    <div id="theme-toggle-container">
+        <button id="theme-toggle" aria-label="Toggle Dark/Light Mode">☀️</button>
+    </div>
+
+    <div id="player-container">
+      <div id="file-input-container">
+           <input type="file" id="file-input" accept="audio/*" multiple>
+        </div>
+
+        <div id="controls">
+            <button id="prev-btn" class='icon-prev' aria-label="Previous"></button>
+            <button id="play-btn" class='icon-play' aria-label="Play/Pause"></button>
+            <button id="stop-btn" class='icon-stop' aria-label="Stop"></button>
+            <button id="next-btn" class='icon-next' aria-label="Next"></button>
+        </div>
+
+        <div id="progress-container">
+              <div id="track-info">
+								<div id ='title'>No Track</div>
+            		<div id = 'time'>0:00 / 0:00</div>
+							</div>
+            <div id="progress-bar">
+                <div id="progress"></div>
+            </div>
+
+        </div>
+
+
+        <div id="volume-container">
+           🔊 
+            <div id="volume-slider">
+              <div class = "volume-bar"></div>
+            </div>
+        </div>
+
+
+        <div id="playlist-container">
+            <ul id="playlist"></ul>
+        </div>
+
+        <div id="visualizer-container"></div>
+           <div id="credits" style="display: none">
+      		<!-- Placeholders for CDN resources loaded Dynamically -->
+        </div>
+    </div>
+
+    <footer>
+        <p>MrAgent - Shokouhi Ltd 2025</p>
+    </footer>
+
+    <script>
+      // --- Core Player Logic ---
+        const audio = new Audio();
+        const playBtn = document.getElementById('play-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progress = document.getElementById('progress');
+        const playlistElement = document.getElementById('playlist');
+        const fileInput = document.getElementById('file-input');
+		    const trackTitle = document.getElementById('title');
+		    const trackTime = document.getElementById('time');
+        const visualizerContainer = document.getElementById('visualizer-container');
+        const volumeSlider = document.getElementById("volume-slider");
+
+
+        let playlist = [];
+        let currentTrackIndex = 0;
+        let audioContext;
+        let analyser;
+        let bufferLength;
+        let dataArray;
+        let bars = []; // Store bar elements
+        let animationFrameId;
+
+      // 1. --- initialization  ---
+
+      function initAudioContext() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048; // Higher value = more detail, but more CPU
+            bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+
+            const source = audioContext.createMediaElementSource(audio);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+          createVisualizerBars();
+         }
+      }
+
+      function createVisualizerBars() {
+          const numBars = 128; // Adjust for desired number of visualizer bars
+          for (let i = 0; i < numBars; i++) {
+              const bar = document.createElement('div');
+              bar.classList.add('bar');
+              visualizerContainer.appendChild(bar);
+              bars.push(bar);
+          }
+      }
+
+      // 2. --- Theme Management ---
+      function toggleTheme() {
+          const body = document.body;
+          body.classList.toggle('light-mode');
+          const isLightMode = body.classList.contains('light-mode');
+          document.getElementById('theme-toggle').textContent = isLightMode ? '🌙' : '☀️';
+          localStorage.setItem('theme', isLightMode ? 'light' : 'dark');
+      }
+
+
+      function loadTheme() {
+          const savedTheme = localStorage.getItem('theme');
+          if (savedTheme === 'light') {
+              document.body.classList.add('light-mode');
+              document.getElementById('theme-toggle').textContent = '🌙';
+          }
+        	else{
+              document.getElementById('theme-toggle').textContent = '☀️';
+          }
+      }
+
+      // 3.--- File Handling and Playlist Management ---
+
+      function handleFiles(files) {
+
+          for (const file of files) {
+              if (file.type.startsWith('audio/')) {
+                const track = {
+                      file: file,
+                      name: file.name,
+                      url: URL.createObjectURL(file) // Create object URL
+                  };
+                  playlist.push(track);
+                  addTrackToPlaylist(track);
+              }
+          }
+           if (playlist.length > 0 && !audio.src) {
+              loadTrack(0); // Load the first track if nothing is playing
+           }
+      }
+
+        function addTrackToPlaylist(track) {
+            const listItem = document.createElement('li');
+            listItem.textContent = track.name;
+            listItem.addEventListener('click', () => {
+                 const index = playlist.findIndex(t => t.name === track.name);
+                 if (index!== -1) {
+                   loadTrack(index);
+                 }
+            });
+            playlistElement.appendChild(listItem);
+        }
+
+
+
+      // 4. --- Playback Controls ---
+
+        function loadTrack(index) {
+              if (index < 0 || index >= playlist.length) return;
+
+              currentTrackIndex = index;
+              audio.src = playlist[index].url; // Use the object URL
+			        trackTitle.textContent = playlist[index].name; //Update the track's title
+              audio.load(); // Load the new source
+              playAudio();
+              updateActivePlaylistItem();
+        }
+
+      function playAudio() {
+          initAudioContext(); // Ensure AudioContext is initialized
+           if (audioContext.state === 'suspended') {
+               audioContext.resume();
+           }
+          audio.play().then(_ => {
+             	playBtn.classList.remove('icon-play');
+							playBtn.classList.add('icon-pause');
+              startVisualizer();
+          }).catch(error => {
+              console.error("Playback failed:", error);
+               stopAudio();
+          });
+      }
+
+      function pauseAudio() {
+          audio.pause();
+        	playBtn.classList.add('icon-play');
+					playBtn.classList.remove('icon-pause');
+          stopVisualizer();
+      }
+
+       function stopAudio() {
+            audio.pause();
+            audio.currentTime = 0;
+            if (audio.src){ // check if audio sorce defined
+            	updateProgress();
+            }
+         		playBtn.classList.add('icon-play');
+						playBtn.classList.remove('icon-pause');
+            stopVisualizer();
+
+        }
+
+       function updateActivePlaylistItem() {
+            const playlistItems = playlistElement.querySelectorAll('li');
+            playlistItems.forEach((item, index) => {
+                if (index === currentTrackIndex) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+      //5. --- Progress Bar ---
+
+       function updateProgress() {
+            const percent = (audio.currentTime / audio.duration) * 100;
+            progress.style.width = isNaN(percent)?  '0%' : `${percent}%`; // Handle NaN case
+         		const currentTimeFormatted = formatTime(audio.currentTime);
+         		const durationFormatted = formatTime(audio.duration);
+         		trackTime.textContent = `${currentTimeFormatted} / ${isNaN(audio.duration)? '0:00' : durationFormatted}`;
+
+        }
+
+        function seek(e) {
+          if(!audio.src) return; //avoid errors if player is empty
+
+          const progressBarRect = progressBar.getBoundingClientRect();
+          const clickPosition = e.clientX - progressBarRect.left;
+          const seekTime = (clickPosition / progressBarRect.width) * audio.duration;
+          audio.currentTime = seekTime;
+          updateProgress();
+
+        }
+      // 6. --- Visualizer ---
+      function startVisualizer() {
+          if (animationFrameId) {
+              cancelAnimationFrame(animationFrameId);
+          }
+          drawVisualizer();
+      }
+
+      function drawVisualizer() {
+           animationFrameId = requestAnimationFrame(drawVisualizer);
+           analyser.getByteFrequencyData(dataArray);
+
+           // Normalize and scale the values to drive the visualizer bar heights
+           const barHeightScale = visualizerContainer.offsetHeight / 255; // Scale to container height
+           bars.forEach((bar, i) => {
+               let value = dataArray[i];
+               bar.style.height = (value * barHeightScale) +  "px"; // Add px unit
+            });
+        }
+
+
+        function stopVisualizer() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = undefined;
+            }
+          //Reset bars
+          for (let bar of bars) {
+            bar.style.height = '0px';
+          }
+        }
+
+      //Volume
+     function updateVolume() {
+         audio.volume = volumeSlider.querySelector(".volume-bar").offsetWidth / volumeSlider.offsetWidth;
+      }
+
+     function seekVolume(e){
+        	if(!audio.src) return;
+
+          const sliderRect = volumeSlider.getBoundingClientRect();
+          const clickPosition = e.clientX - sliderRect.left;
+          const newWidth = Math.min(Math.max(clickPosition, 0), sliderRect.width); // limit
+          volumeSlider.querySelector(".volume-bar").style.width = `${newWidth}px`;  // Update the volume visually
+          updateVolume(); // Update the actual audio volume
+      }
+
+          // 7. ---  Time format ---
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+        // --- Event Listeners ---
+        playBtn.addEventListener('click', () => {
+            if (audio.paused) {
+                playAudio();
+            } else {
+                pauseAudio();
+            }
+        });
+        stopBtn.addEventListener('click', stopAudio);
+        nextBtn.addEventListener('click', () => loadTrack(currentTrackIndex + 1));
+        prevBtn.addEventListener('click', () => loadTrack(currentTrackIndex - 1));
+        audio.addEventListener('timeupdate', updateProgress);
+		    audio.addEventListener('ended', () => {
+             loadTrack(currentTrackIndex + 1);   //load next if not end
+        });
+        progressBar.addEventListener('click', seek);
+        fileInput.addEventListener('change', (event) => handleFiles(event.target.files));
+        volumeSlider.addEventListener('click', seekVolume);
+
+       // Theme Toggle
+        document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+         // Initial Setup
+        loadTheme();
+        updateVolume(); // Set initial volume
+      	audio.volume = 1; // Start with maximum volume
+
+
+        // --- Lazy Loading (example with a dummy image) ---
+          function lazyLoadResource(type, src, containerId) {
+              return new Promise((resolve, reject) => {
+                let element;
+                switch (type) {
+                  case "script":
+                    element = document.createElement('script');
+                    element.src = src;
+                    element.async = true;
+					          element.defer = true;
+                    break;
+                  case "style":
+                    element = document.createElement('link');
+                    element.rel = 'stylesheet';
+                    element.href = src;
+                    break;
+                  case "image": // Example case for image.
+                    element = document.createElement('img');
+                    element.src = src;
+                    break;
+                  default:
+                    reject(new Error(`Unsupported resource type: ${type}`));
+                    return;
+                }
+
+                element.onload = () => resolve(element);
+                element.onerror = () => reject(new Error(`Failed to load resource: ${src}`));
+                document.getElementById(containerId).appendChild(element);  // in #credits
+            });
+          }
+
+        //Example:
+        //  lazyLoadResource('script', 'https://cdnjs.cloudflare.com/ajax/libs/some-library/1.0.0/some-library.min.js', 'credits')
+        //   .then(() => { console.log('library loaded!'); /* Use the library */  })
+        //   .catch(err => console.error(err));
+
+    </script>
+</body>
+</html>
