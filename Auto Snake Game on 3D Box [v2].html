@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Snake A*</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: sans-serif;
+        }
+
+        #container {
+            perspective: 1000px;
+        }
+
+        #cube {
+            width: 300px;
+            height: 300px;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: rotate 20s linear infinite;
+        }
+
+        .face {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border: 1px solid #555;
+            box-sizing: border-box;
+            display: flex; /* Use flexbox for centering canvas */
+            justify-content: center;
+            align-items: center;
+        }
+     .face canvas {
+      width: 95%;
+      height: 95%;
+        }
+
+
+        .front  { transform: rotateY(  0deg) translateZ(150px); }
+        .back   { transform: rotateY(180deg) translateZ(150px); }
+        .right  { transform: rotateY( 90deg) translateZ(150px); }
+        .left   { transform: rotateY(-90deg) translateZ(150px); }
+        .top    { transform: rotateX( 90deg) translateZ(150px); }
+        .bottom { transform: rotateX(-90deg) translateZ(150px); }
+
+      .front { background-color: rgba(0, 80, 0, 0.5) }
+       .back { background-color: rgba(0, 0, 80, 0.5) }
+       .right { background-color: rgba(80, 0, 0, 0.5) }
+        .left { background-color: rgba(80, 80, 0, 0.5) }
+      .top { background-color: rgba(0, 80, 80, 0.5) }
+       .bottom { background-color: rgba(80, 0, 80, 0.5) }
+
+
+        @keyframes rotate {
+            from { transform: rotate3d(1, 1, 1, 0deg); }
+            to { transform: rotate3d(1, 1, 1, 360deg); }
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10; /* Ensure controls are above the cube */
+    }
+
+    #controls button {
+      padding: 8px 12px;
+      background-color: rgba(255,255,255,0.8);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+     #controls button:hover {
+        background-color: rgba(255,255,255,1);
+      }
+         footer {
+            position: absolute;
+            bottom: 5px;
+            width: 100%;
+            text-align: center;
+            color: #aaa;
+            font-size: 12px;
+           z-index:10;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="cube">
+            <div class="face front"><canvas id="gameCanvas"></canvas></div>
+            <div class="face back"></div>
+            <div class="face right"></div>
+            <div class="face left"></div>
+            <div class="face top"></div>
+            <div class="face bottom"></div>
+        </div>
+    </div>
+    <div id="controls">
+    <button id="pauseBtn">Pause</button>
+    <button id="resetBtn">Reset</button>
+    </div>
+
+  <footer>MrAgent - Shokouhi Ltd 2025</footer>
+
+    <script>
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 20;
+        const gridWidth = 15;
+        const gridHeight = 15;
+        canvas.width = gridWidth * gridSize;
+        canvas.height = gridHeight * gridSize;
+
+        let snake = [{ x: 5, y: 5 }];
+        let fruit = {};
+        let direction = 'right';
+        let score = 0;
+          let paused = false;
+        let gameLoopInterval;
+
+       //Load Three.js lazily
+    function loadScript(src, callback) {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = callback;
+        script.async = true;  // Ensure asynchronous loading
+        document.head.appendChild(script);
+    }
+
+        // A* Algorithm
+        function aStar(start, goal) {
+            const openSet = [start];
+            const cameFrom = {};
+            const gScore = { [getKey(start)]: 0 };
+            const fScore = { [getKey(start)]: heuristic(start, goal) };
+
+            while (openSet.length > 0) {
+                openSet.sort((a, b) => fScore[getKey(a)] - fScore[getKey(b)]);
+                const current = openSet.shift();
+
+                if (current.x === goal.x && current.y === goal.y) {
+                    return reconstructPath(cameFrom, current);
+                }
+
+                const neighbors = getNeighbors(current);
+                for (const neighbor of neighbors) {
+                    const tentativeGScore = gScore[getKey(current)] + 1;
+                    if (tentativeGScore < (gScore[getKey(neighbor)] || Infinity)) {
+                        cameFrom[getKey(neighbor)] = current;
+                        gScore[getKey(neighbor)] = tentativeGScore;
+                        fScore[getKey(neighbor)] = tentativeGScore + heuristic(neighbor, goal);
+                        if (!openSet.some(n => n.x === neighbor.x && n.y === neighbor.y)) {
+                            openSet.push(neighbor);
+                        }
+                    }
+                }
+            }
+
+            return []; // No path found
+        }
+
+    function heuristic(a, b) {
+      return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); // Manhattan distance
+    }
+
+    function getKey(node) {
+        return `${node.x},${node.y}`;
+    }
+    function getNeighbors(node) {
+      const neighbors = [];
+      const { x, y } = node;
+      const potentialNeighbors = [
+        { x: x + 1, y: y },
+        { x: x - 1, y: y },
+        { x: x, y: y + 1 },
+        { x: x, y: y - 1 },
+      ];
+
+      for (const neighbor of potentialNeighbors) {
+          if (neighbor.x >= 0 && neighbor.x < gridWidth &&
+                neighbor.y >= 0 && neighbor.y < gridHeight &&
+                !snake.some(segment => segment.x === neighbor.x && segment.y === neighbor.y))
+          {
+                neighbors.push(neighbor);
+          }
+
+      }
+        return neighbors;
+    }
+
+    function reconstructPath(cameFrom, current) {
+        const path = [current];
+        while (cameFrom[getKey(current)]) {
+            current = cameFrom[getKey(current)];
+            path.unshift(current);
+        }
+        return path;
+    }
+
+    function generateFruit() {
+    do {
+        fruit = {
+          x: Math.floor(Math.random() * gridWidth),
+          y: Math.floor(Math.random() * gridHeight)
+        };
+      } while (snake.some(segment => segment.x === fruit.x && segment.y === fruit.y));
+    }
+
+      function update() {
+
+        if(paused) return;
+
+      const head = { ...snake[0] };
+      const path = aStar(head, fruit);
+
+         if (path.length > 1) {
+            const nextStep = path[1];  //The very next step
+             head.x = nextStep.x;
+             head.y = nextStep.y;
+        }  else {
+             //If no path or at fruit, random move (or better:  try again next tick)
+             const neighbors = getNeighbors(head);
+                if (neighbors.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * neighbors.length);
+                  head.x = neighbors[randomIndex].x;
+                  head.y = neighbors[randomIndex].y;
+                }
+
+         }
+
+
+      //Collision Detection
+      if (head.x === fruit.x && head.y === fruit.y) {
+        score++;
+        generateFruit();
+      } else {
+        snake.pop();
+      }
+
+     if (head.x < 0 || head.x >= gridWidth || head.y < 0 || head.y >= gridHeight || snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+    resetGame(); // Game Over
+    return;
+  }
+
+    snake.unshift(head);
+    draw();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw Snake
+        ctx.fillStyle = 'lime';
+        for (const segment of snake) {
+            ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+        }
+
+        // Draw Fruit
+        ctx.fillStyle = 'red';
+        ctx.fillRect(fruit.x * gridSize, fruit.y * gridSize, gridSize, gridSize);
+
+       //Draw Score (optional - could add to a separate UI element)
+        ctx.fillStyle = 'white';
+        ctx.font = '16px Arial';
+        ctx.fillText(`Score: ${score}`, 10, 20);
+    }
+    function resetGame() {
+             snake = [{ x: 5, y: 5 }];
+        generateFruit();
+        score = 0;
+              direction = 'right';
+            clearInterval(gameLoopInterval);
+
+          if(!paused) //Prevent double start if reset during Pause
+              gameLoopInterval = setInterval(update, 150);
+
+    }
+
+      document.getElementById('pauseBtn').addEventListener('click', () => {
+        paused = !paused;
+          document.getElementById('pauseBtn').textContent = paused? "Resume" : "Pause";
+        if (paused) {
+          clearInterval(gameLoopInterval);
+        } else {
+            if(snake.length > 0){ //Prevent error when pressing resume before game start
+              gameLoopInterval = setInterval(update, 150);
+        }
+        }
+      });
+
+      document.getElementById('resetBtn').addEventListener('click', resetGame);
+
+
+        generateFruit();
+    //  gameLoopInterval = setInterval(update, 150);
+        resetGame(); //Start game on load
+        draw();
+
+
+    </script>
+</body>
+</html>
