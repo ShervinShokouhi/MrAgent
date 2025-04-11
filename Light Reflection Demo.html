@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light and Mirrors Physics Demo</title>
+    <style>
+        /* CSS Styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            transition: background-color 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .dark-mode {
+            background-color: #333;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            flex-grow: 1; /* Make container grow to fill space */
+        }
+
+        .dark-mode .container {
+            background-color: #444;
+            border-color: #555;
+            color: #fff;
+        }
+
+        .header {
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            gap: 10px; /* Add space between elements */
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header select, .header button {
+            padding: 8px 12px; /* Adjusted padding */
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff; /* Ensure selects/button have bg */
+            color: #333; /* Ensure selects/button have text color */
+        }
+
+        .dark-mode .header select, .dark-mode .header button {
+            background-color: #555;
+            color: #fff;
+            border-color: #666;
+        }
+
+
+        .simulation-container {
+            position: relative;
+            width: 100%;
+            height: 450px; /* Increased height */
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            overflow: hidden;
+            background-color: #e0f2f7; /* Light blue background for simulation */
+        }
+         .dark-mode .simulation-container {
+             background-color: #263238; /* Darker blue-grey background */
+             border-color: #555;
+         }
+
+        .light-source {
+            position: absolute;
+            top: 50%;
+            left: 20px; /* Start further left */
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            background-color: #ffff00; /* Yellow */
+            border-radius: 50%;
+            cursor: move;
+            z-index: 10; /* Ensure source is above rays */
+            border: 1px solid #cc0; /* Slight border */
+        }
+
+        .optical-element {
+            position: absolute;
+            width: 10px; /* Thinner elements */
+            height: 80px; /* Taller elements */
+            background-color: rgba(204, 204, 204, 0.7); /* Semi-transparent */
+            border: 1px solid #aaa;
+            cursor: move;
+            z-index: 5; /* Below light source, above rays */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #555;
+            box-sizing: border-box; /* Include border in size */
+        }
+        .dark-mode .optical-element {
+            background-color: rgba(100, 100, 100, 0.7);
+            border-color: #777;
+            color: #ccc;
+        }
+
+        /* === Specific Element Styles === */
+        .lens {
+             /* Basic style shared */
+        }
+        .lens.convex {
+            border-radius: 5px / 20px; /* Elliptical top/bottom */
+            border-width: 1px;
+        }
+        .lens.concave {
+             /* Make it appear thinner in the middle */
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 40px solid rgba(204, 204, 204, 0.7);
+            border-bottom: 40px solid rgba(204, 204, 204, 0.7);
+            background-color: transparent; /* Remove center background */
+            width: 0; /* Adjust width */
+            height: 0; /* Adjust height */
+            position: absolute; /* Needed for border shaping */
+
+        }
+         .dark-mode .lens.concave {
+            border-top-color: rgba(100, 100, 100, 0.7);
+            border-bottom-color: rgba(100, 100, 100, 0.7);
+         }
+
+        .mirror {
+            background-color: #silver; /* More metallic */
+        }
+         .dark-mode .mirror {
+             background-color: #888;
+         }
+
+        .mirror.plane {
+            border-radius: 0;
+        }
+        .mirror.concave {
+            border-radius: 50% 0 0 50% / 50% 0 0 50%; /* Curve on one side */
+             border-left-width: 3px;
+        }
+        .mirror.convex {
+            border-radius: 0 50% 50% 0 / 0 50% 50% 0; /* Curve on the other side */
+             border-right-width: 3px;
+        }
+
+        /* === SVG for Rays === */
+         #ray-canvas {
+             position: absolute;
+             top: 0;
+             left: 0;
+             width: 100%;
+             height: 100%;
+             pointer-events: none; /* Allow clicks to pass through */
+             z-index: 1; /* Draw rays below elements */
+         }
+
+         #ray-canvas line {
+             stroke: rgb(255, 100, 0); /* Orange-red light */
+             stroke-width: 1;
+             opacity: 0.7;
+         }
+         .dark-mode #ray-canvas line {
+             stroke: rgb(255, 150, 50); /* Brighter orange on dark */
+         }
+
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-bottom: 10px; /* Add padding at bottom */
+            font-size: 14px;
+            color: #666;
+        }
+
+        .dark-mode .footer {
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <select id="element-select">
+                <option value="convex-lens">Convex Lens</option>
+                <option value="concave-lens">Concave Lens</option>
+                <option value="plane-mirror">Plane Mirror</option>
+                <option value="concave-mirror">Concave Mirror</option>
+                <option value="convex-mirror">Convex Mirror</option>
+            </select>
+            <button id="add-element">Add Selected Element</button>
+            <button id="clear-elements">Clear Elements</button>
+            <button id="theme-toggle">Toggle Dark Mode</button>
+        </div>
+        <div class="simulation-container" id="simulation-container">
+            <svg id="ray-canvas"></svg>
+            <div class="light-source" id="light-source"></div>
+            <!-- Optical elements will be added here -->
+        </div>
+    </div>
+    <div class="footer">
+        MrAgent - Shokouhi Ltd 2025
+    </div>
+
+    <script>
+        // No external libraries needed for this version
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initSimulation();
+        });
+
+        // Initialize simulation
+        function initSimulation() {
+            // Get elements
+            const simulationContainer = document.getElementById('simulation-container');
+            const lightSource = document.getElementById('light-source');
+            const elementSelect = document.getElementById('element-select');
+            const addElementButton = document.getElementById('add-element');
+            const clearElementsButton = document.getElementById('clear-elements');
+            const themeToggle = document.getElementById('theme-toggle');
+            const rayCanvas = document.getElementById('ray-canvas');
+
+            let opticalElements = []; // Store references to optical elements
+
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+                // Redraw rays in case color needs to change (handled by CSS now)
+                drawRays();
+            });
+
+            // Add Element Button
+            addElementButton.addEventListener('click', () => {
+                const selectedType = elementSelect.value;
+                createElement(selectedType);
+                drawRays(); // Update rays after adding
+            });
+
+            // Clear Elements Button
+            clearElementsButton.addEventListener('click', () => {
+                opticalElements.forEach(el => el.element.remove());
+                opticalElements = [];
+                drawRays(); // Clear rays
+            });
+
+
+            // Make Light Source Draggable
+            makeDraggable(lightSource, simulationContainer, () => drawRays()); // Pass drawRays as callback
+
+            // Create and add optical element
+            function createElement(type) {
+                const element = document.createElement('div');
+                element.classList.add('optical-element');
+                const [elementType, shape] = type.split('-'); // e.g., "convex-lens" -> ["convex", "lens"]
+
+                element.classList.add(shape); // Add 'lens' or 'mirror'
+                if (elementType) {
+                    element.classList.add(elementType); // Add 'convex', 'concave', or 'plane'
+                }
+                element.dataset.type = type; // Store full type for simulation logic
+                element.dataset.focalLength = calculateFocalLength(type); // Assign a default focal length
+
+                // Initial position (avoid overlap, place in middle vertically)
+                const existingElements = simulationContainer.querySelectorAll('.optical-element');
+                const initialLeft = 150 + existingElements.length * 30; // Stagger initial placement
+                const initialTop = simulationContainer.offsetHeight / 2 - 40; // Center vertically
+
+                element.style.left = `${Math.min(initialLeft, simulationContainer.offsetWidth - 30)}px`;
+                element.style.top = `${Math.max(0, initialTop)}px`;
+
+                simulationContainer.appendChild(element);
+
+                const elementData = { element: element, type: type, focalLength: parseFloat(element.dataset.focalLength) };
+                 opticalElements.push(elementData);
+
+                makeDraggable(element, simulationContainer, () => drawRays()); // Make draggable and redraw on move
+            }
+
+             // --- Basic Focal Length Assignment (Placeholder) ---
+             function calculateFocalLength(type) {
+                 const elementWidth = 10; // As defined in CSS
+                 const simWidth = simulationContainer.offsetWidth;
+                 switch (type) {
+                     case 'convex-lens': return simWidth / 4; // Converging
+                     case 'concave-lens': return -simWidth / 4; // Diverging
+                     case 'concave-mirror': return simWidth / 6; // Converging
+                     case 'convex-mirror': return -simWidth / 6; // Diverging
+                     case 'plane-mirror': return Infinity;
+                     default: return Infinity;
+                 }
+             }
+
+
+            // --- Drag element function ---
+            function makeDraggable(element, boundaryContainer, onDragCallback) {
+                let isDown = false;
+                let offset = { x: 0, y: 0 };
+
+                element.addEventListener('mousedown', (e) => {
+                    // Prevent dragging interfering with text selection etc.
+                    e.preventDefault();
+                    isDown = true;
+                    offset = {
+                        x: element.offsetLeft - e.clientX,
+                        y: element.offsetTop - e.clientY
+                    };
+                    element.style.zIndex = 1000; // Bring dragged element to front
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (isDown) {
+                        // Calculate potential new position
+                        let newX = e.clientX + offset.x;
+                        let newY = e.clientY + offset.y;
+
+                        // Constrain within boundaryContainer
+                        const minX = 0;
+                        const minY = 0;
+                        const maxX = boundaryContainer.offsetWidth - element.offsetWidth;
+                        const maxY = boundaryContainer.offsetHeight - element.offsetHeight;
+
+                        element.style.left = `${Math.max(minX, Math.min(newX, maxX))}px`;
+                        element.style.top = `${Math.max(minY, Math.min(newY, maxY))}px`;
+
+                        // Execute callback if provided (e.g., redraw rays)
+                        if (onDragCallback) {
+                            onDragCallback();
+                        }
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    if (isDown) {
+                        isDown = false;
+                        element.style.zIndex = element.classList.contains('light-source') ? 10 : 5; // Reset z-index
+                    }
+                });
+            }
+
+            // --- Light Simulation (Simplified Ray Tracing) ---
+            function clearRays() {
+                rayCanvas.innerHTML = ''; // Clear previous rays
+            }
+
+            function drawRays() {
+                clearRays();
+
+                const sourceX = lightSource.offsetLeft + lightSource.offsetWidth / 2;
+                const sourceY = lightSource.offsetTop + lightSource.offsetHeight / 2;
+                const numRays = 7; // Number of rays to draw
+
+                for (let i = 0; i < numRays; i++) {
+                    // Initial angle spread
+                    const angle = (i - (numRays - 1) / 2) * (Math.PI / 18); // Spread rays over ~ +/- 30 degrees
+                     drawSingleRay(sourceX, sourceY, angle);
+                }
+            }
+             function drawSingleRay(startX, startY, initialAngle) {
+                let currentX = startX;
+                let currentY = startY;
+                let currentAngle = initialAngle;
+                const maxBounces = 3; // Limit reflections/refractions
+                const maxRayLength = simulationContainer.offsetWidth * 2; // Limit total length
+                let totalLength = 0;
+
+                 for (let bounce = 0; bounce < maxBounces; bounce++) {
+                    let closestIntersection = null;
+                    let closestElement = null;
+                    let minDist = maxRayLength;
+
+                    // Find the first intersection point
+                    opticalElements.forEach(optElement => {
+                     const intersection = findIntersection(currentX, currentY, currentAngle, optElement.element, optElement.type);
+                     if (intersection && intersection.dist < minDist && intersection.dist > 1e-6) { // Check distance > 0
+                        minDist = intersection.dist;
+                        closestIntersection = intersection;
+                        closestElement = optElement;
+                     }
+                    });
+
+                    let endX, endY;
+
+                    if (closestIntersection) {
+                         // Draw ray segment to the intersection point
+                        endX = closestIntersection.x;
+                        endY = closestIntersection.y;
+
+                         // Check if segment length exceeds max allowed
+                         if (totalLength + closestIntersection.dist > maxRayLength) {
+                             const remainingLength = maxRayLength - totalLength;
+                             endX = currentX + Math.cos(currentAngle) * remainingLength;
+                             endY = currentY + Math.sin(currentAngle) * remainingLength;
+                             drawLine(currentX, currentY, endX, endY);
+                             break; // Stop drawing this ray
+                         }
+
+                        drawLine(currentX, currentY, endX, endY);
+                        totalLength += closestIntersection.dist;
+
+                        // Calculate new angle based on element type
+                        const { newAngle, continueRay } = calculateNewAngle(
+                            currentAngle,
+                            closestElement.type,
+                            closestElement.focalLength,
+                            closestIntersection,
+                            closestElement.element
+                        );
+
+                         if (!continueRay) break; // Absorbed or other ending condition
+
+                        currentX = endX;
+                        currentY = endY;
+                        currentAngle = newAngle;
+
+                     } else {
+                         // No intersection, draw ray to edge of container
+                         const edgePoint = findEdgePoint(currentX, currentY, currentAngle);
+                         const distToEdge = Math.sqrt((edgePoint.x - currentX)**2 + (edgePoint.y - currentY)**2);
+
+                         if (totalLength + distToEdge > maxRayLength) {
+                             const remainingLength = maxRayLength - totalLength;
+                             endX = currentX + Math.cos(currentAngle) * remainingLength;
+                             endY = currentY + Math.sin(currentAngle) * remainingLength;
+                         } else {
+                             endX = edgePoint.x;
+                             endY = edgePoint.y;
+                         }
+                         drawLine(currentX, currentY, endX, endY);
+                         break; // Ray exits simulation area
+                     }
+                 }
+             }
+
+
+            function findIntersection(startX, startY, angle, element, type) {
+                // Simplified: Treat elements as vertical lines at their center X
+                const elRect = element.getBoundingClientRect();
+                const simRect = simulationContainer.getBoundingClientRect();
+                const elX = element.offsetLeft + element.offsetWidth / 2;
+                const elTop = element.offsetTop;
+                const elBottom = element.offsetTop + element.offsetHeight;
+
+                const cosA = Math.cos(angle);
+                const sinA = Math.sin(angle);
+
+                // Avoid division by zero for vertical rays
+                 if (Math.abs(cosA) < 1e-6) return null;
+
+                 const dist = (elX - startX) / cosA;
+
+                 // Ensure intersection is in the forward direction of the ray
+                 if (dist < 1e-6) return null;
+
+                 const intersectY = startY + dist * sinA;
+
+                // Check if intersection is within the vertical bounds of the element
+                if (intersectY >= elTop && intersectY <= elBottom) {
+                    return { x: elX, y: intersectY, dist: dist };
+                }
+
+                return null;
+            }
+
+             function calculateNewAngle(incomingAngle, type, focalLength, intersection, element) {
+                 const elX = element.offsetLeft + element.offsetWidth / 2;
+                 const elY = element.offsetTop + element.offsetHeight / 2; // Element center Y
+                 const intersectY = intersection.y;
+
+                 // --- Mirrors ---
+                 if (type.includes('mirror')) {
+                     let normalAngle;
+                     if (type === 'plane-mirror') {
+                         normalAngle = Math.PI; // Normal points left (-x direction)
+                     } else if (type === 'concave-mirror') {
+                         // Simplified normal approximation for a curve centered to the right
+                         const radius = focalLength * 2; // R = 2f
+                         const centerX = elX + radius;
+                         normalAngle = Math.atan2(intersectY - elY, elX - centerX);
+                     } else if (type === 'convex-mirror') {
+                         // Simplified normal approximation for a curve centered to the left
+                         const radius = focalLength * 2; // R = 2f (f is negative)
+                         const centerX = elX + radius; // radius is negative
+                         normalAngle = Math.atan2(intersectY - elY, elX - centerX);
+                     } else {
+                          return { newAngle: incomingAngle, continueRay: true }; // Unknown mirror type
+                     }
+
+                     // Law of Reflection: angle_out = 2 * angle_normal - angle_in + PI
+                     const reflectedAngle = 2 * normalAngle - incomingAngle + Math.PI;
+                     return { newAngle: normalizeAngle(reflectedAngle), continueRay: true };
+                 }
+
+                 // --- Lenses (Thin Lens Approximation using Ray Rules - Simplified) ---
+                 if (type.includes('lens')) {
+                     const isConvex = type === 'convex-lens';
+                     const distToCenterY = intersectY - elY;
+
+                     // Ray through center (approximately): Undeviated
+                     if (Math.abs(distToCenterY) < 5) { // Allow small tolerance
+                         return { newAngle: incomingAngle, continueRay: true };
+                     }
+
+                     // Parallel Ray Rule (Approximate for rays near source axis)
+                     // If a ray is approximately parallel to the axis (small initial angle maybe? Hard to determine here)
+                     // -> it should bend towards/away from focal point F' after the lens.
+                     // Simplified: Bend based on distance from center -> towards/away from focal point
+                     // This is a *very* rough approximation of thin lens formula effect
+
+                     // Estimate angle change needed to point towards/away from focal point
+                      const exitFocalX = elX + focalLength; // Focal point on the exit side
+                      const angleToFocal = Math.atan2(intersectY - elY, exitFocalX - elX); // This isn't quite right physics
+
+                      // Heuristic: bend more farther from center, towards/away from axis based on FL
+                      const bendFactor = 0.5; // How much to bend
+                      let angleChange = (distToCenterY / (element.offsetHeight / 2)) * (isConvex ? -bendFactor : bendFactor);
+
+                      //Ensure angle change isn't too extreme
+                      angleChange = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, angleChange));
+
+
+                     return { newAngle: normalizeAngle(incomingAngle + angleChange), continueRay: true };
+                 }
+
+                 // Default: No change
+                 return { newAngle: incomingAngle, continueRay: true };
+             }
+
+             function normalizeAngle(angle) {
+                 // Keep angle between -PI and PI
+                 while (angle <= -Math.PI) angle += 2 * Math.PI;
+                 while (angle > Math.PI) angle -= 2 * Math.PI;
+                 return angle;
+            }
+
+
+            function findEdgePoint(startX, startY, angle) {
+                const W = simulationContainer.offsetWidth;
+                const H = simulationContainer.offsetHeight;
+                const cosA = Math.cos(angle);
+                const sinA = Math.sin(angle);
+                let T = Infinity;
+
+                // Check intersection with right edge (x = W)
+                if (cosA > 1e-6) {
+                    const t = (W - startX) / cosA;
+                     if (t > 1e-6) T = Math.min(T, t);
+                }
+                 // Check intersection with left edge (x = 0)
+                if (cosA < -1e-6) {
+                    const t = (0 - startX) / cosA;
+                      if (t > 1e-6) T = Math.min(T, t);
+                }
+                 // Check intersection with bottom edge (y = H)
+                 if (sinA > 1e-6) {
+                     const t = (H - startY) / sinA;
+                      if (t > 1e-6) T = Math.min(T, t);
+                 }
+                 // Check intersection with top edge (y = 0)
+                 if (sinA < -1e-6) {
+                     const t = (0 - startY) / sinA;
+                      if (t > 1e-6) T = Math.min(T, t);
+                 }
+
+                if (T === Infinity) { // Should not happen in bounded box if angle is valid
+                    return { x: startX, y: startY };
+                }
+
+                 return {
+                     x: startX + cosA * T,
+                     y: startY + sinA * T
+                 };
+             }
+
+            function drawLine(x1, y1, x2, y2) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                rayCanvas.appendChild(line);
+            }
+
+            // Initial draw
+            drawRays();
+        }
+
+
+        // ---- Console Error Forwarding ---- //
+        (function() {
+            const originalConsoleError = console.error;
+            console.error = function(...args) {
+                 if (window.parent && window.parent !== window) { // Check if inside an iframe
+                    window.parent.postMessage({
+                        type: 'consoleError',
+                        error: args.map(arg => String(arg)).join(' ') // Ensure args are strings
+                    }, '*');
+                 }
+                originalConsoleError.apply(console, args);
+            };
+
+            window.addEventListener('error', (event) => {
+                 if (window.parent && window.parent !== window) {
+                     window.parent.postMessage({
+                         type: 'consoleError',
+                         error: event.message || 'Unknown error'
+                    }, '*');
+                 }
+             });
+
+             // Send loaded message only if inside an iframe
+             if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'scriptLoaded' }, '*');
+             }
+         })();
+    </script>
+
+</body>
+</html>
