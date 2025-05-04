@@ -46,7 +46,10 @@
             text-align: center;
             line-height: 25px;
             font-size: 20px; /* Adjust emoji size */
-            animation: heartbeat 1s infinite alternate; /* Add heartbeat animation */
+        }
+
+        .active-block {
+            animation: heartbeat 2s infinite alternate; /* Add heartbeat animation */
         }
 
         @keyframes heartbeat {
@@ -446,7 +449,23 @@
 
     function startActiveBlockBlink() {
         activeBlockBlinkInterval = setInterval(() => {
-            renderBoard(); // Re-render to apply/remove blinking class
+            // Remove the class from all cells first
+            const gameBoardDiv = document.getElementById('game-board');
+            Array.from(gameBoardDiv.children).forEach(cell => cell.classList.remove('active-block'));
+
+            //Then add the class to the current block cells
+            if (currentBlock) {
+                for (let row = 0; row < currentBlock.shape.length; row++) {
+                    for (let col = 0; col < currentBlock.shape[row].length; col++) {
+                        if (currentBlock.shape[row][col]) {
+                            let index = (currentBlock.y + row) * BOARD_WIDTH + (currentBlock.x + col);
+                            if(index >= 0 && index < gameBoardDiv.children.length){
+                                gameBoardDiv.children[index].classList.add('active-block'); // Add class for blinking
+                            }
+                        }
+                    }
+                }
+            }
         }, 500); // Adjust timing as needed
     }
 
