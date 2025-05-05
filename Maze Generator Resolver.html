@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Maze Generator and Solver</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css" integrity="sha512-NhSC1YmyruXifcj/KFRWoC561YpHpc5Jtzgvbuzx5VozKpWvQ+4nXhPdFgmx8xqexRcpAglTj9sIBWINXa8x5w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js" integrity="sha512-8OWC+pX5iZZIiu6dmz7d+CtjvvH87M2oX3z3Rk739B2cSTjJm2/h09p3o6KfoY9oX12r/v1X3bB+7wWjC9Qy0w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+
+        #controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        #canvas {
+            border: 1px solid #000;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #3e8e41;
+        }
+
+        input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 60px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label for="width">Width:</label>
+        <input type="number" id="width" value="20">
+        <label for="height">Height:</label>
+        <input type="number" id="height" value="15">
+        <button id="generateButton">Generate</button>
+        <button id="solveButton">Solve</button>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // Maze Generator and Solver using Recursive Backtracker and Depth-First Search
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const widthInput = document.getElementById('width');
+        const heightInput = document.getElementById('height');
+        const generateButton = document.getElementById('generateButton');
+        const solveButton = document.getElementById('solveButton');
+
+        let maze = null;
+        let solving = false;
+        let solutionPath = [];
+        let animationFrameId = null;
+
+        const CELL_SIZE = 20;
+        const WALL_COLOR = '#000';
+        const PATH_COLOR = '#fff';
+        const SOLUTION_COLOR = 'red';
+        const EXPLORED_COLOR = 'lightblue';
+
+
+        class Maze {
+            constructor(width, height) {
+                this.width = width;
+                this.height = height;
+                this.grid = Array(height).fill(null).map(() => Array(width).fill(0)); // 0: no walls
+                this.visited = Array(height).fill(null).map(() => Array(width).fill(false));
+                this.start = { x: 0, y: 0 };
+                this.end = { x: width - 1, y: height - 1 };
+            }
+
+            generate() {
+                // Reset grid and visited
+                this.grid = Array(this.height).fill(null).map(() => Array(this.width).fill(0xF)); // 0xF: all walls present
+                this.visited = Array(this.height).fill(null).map(() => Array(this.width).fill(false));
+                this.recursiveBacktracker(0, 0);
+            }
+
+            recursiveBacktracker(x, y) {
+                this.visited[y][x] = true;
+                const directions = [{dx: 0, dy: -1, bit: 1}, // N
+                                    {dx: 1, dy: 0, bit: 2}, // E
+                                    {dx: 0, dy: 1, bit: 4}, // S
+                                    {dx: -1, dy: 0, bit: 8}]; // W
+                
+                // Shuffle directions to make maze more random
+                directions.sort(() => Math.random() - 0.5);
+
+                for (const dir of directions) {
+                    const nx = x + dir.dx;
+                    const ny = y + dir.dy;
+
+                    if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height && !this.visited[ny][nx]) {
+                        // Remove the wall between current cell and the next cell
+                        this.grid[y][x] &= ~(dir.bit);        // Clear wall in current cell
+                        this.grid[ny][nx] &= ~(directions.find(d => d.dx === -dir.dx && d.dy === -dir.dy).bit); // Clear wall in next cell
+                        this.recursiveBacktracker(nx, ny);
+                    }
+                }
+            }
+
+
+            solve() {
+                this.solutionPath = []; // Reset solution path
+                this.visited = Array(this.height).fill(null).map(() => Array(this.width).fill(false));
+                return this.depthFirstSearch(this.start.x, this.start.y);
+            }
+
+
+            depthFirstSearch(x, y) {
+                if (x === this.end.x && y === this.end.y) {
+                    this.solutionPath.push({ x, y });
+                    return true;
+                }
+
+                this.visited[y][x] = true;
+
+                const directions = [{dx: 0, dy: -1, bit: 1}, // N
+                                    {dx: 1, dy: 0, bit: 2}, // E
+                                    {dx: 0, dy: 1, bit: 4}, // S
+                                    {dx: -1, dy: 0, bit: 8}]; // W
+
+                for (const dir of directions) {
+                    const nx = x + dir.dx;
+                    const ny = y + dir.dy;
+
+                    if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height &&
+                        !this.visited[ny][nx] && !(this.grid[y][x] & dir.bit)) {
+
+                        if (this.depthFirstSearch(nx, ny)) {
+                            this.solutionPath.push({ x, y });
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+
+            draw() {
+                canvas.width = this.width * CELL_SIZE;
+                canvas.height = this.height * CELL_SIZE;
+
+                ctx.fillStyle = PATH_COLOR;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = WALL_COLOR;
+                ctx.lineWidth = 2;
+
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        const cell = this.grid[y][x];
+
+                        if (cell & 1) { // North
+                            ctx.beginPath();
+                            ctx.moveTo(x * CELL_SIZE, y * CELL_SIZE);
+                            ctx.lineTo((x + 1) * CELL_SIZE, y * CELL_SIZE);
+                            ctx.stroke();
+                        }
+                        if (cell & 2) { // East
+                            ctx.beginPath();
+                            ctx.moveTo((x + 1) * CELL_SIZE, y * CELL_SIZE);
+                            ctx.lineTo((x + 1) * CELL_SIZE, (y + 1) * CELL_SIZE);
+                            ctx.stroke();
+                        }
+                        if (cell & 4) { // South
+                            ctx.beginPath();
+                            ctx.moveTo(x * CELL_SIZE, (y + 1) * CELL_SIZE);
+                            ctx.lineTo((x + 1) * CELL_SIZE, (y + 1) * CELL_SIZE);
+                            ctx.stroke();
+                        }
+                        if (cell & 8) { // West
+                            ctx.beginPath();
+                            ctx.moveTo(x * CELL_SIZE, y * CELL_SIZE);
+                            ctx.lineTo(x * CELL_SIZE, (y + 1) * CELL_SIZE);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+
+            drawSolution(path) {
+                ctx.fillStyle = SOLUTION_COLOR;
+                for (const cell of path) {
+                    ctx.fillRect(cell.x * CELL_SIZE + CELL_SIZE * 0.25, cell.y * CELL_SIZE + CELL_SIZE * 0.25, CELL_SIZE * 0.5, CELL_SIZE * 0.5);
+                }
+            }
+
+            drawExplored(x, y) {
+                ctx.fillStyle = EXPLORED_COLOR;
+                ctx.fillRect(x * CELL_SIZE + CELL_SIZE * 0.25, y * CELL_SIZE + CELL_SIZE * 0.25, CELL_SIZE * 0.5, CELL_SIZE * 0.5);
+            }
+
+
+
+            animateSolution() {
+                let i = this.solutionPath.length - 1; // Start from the end
+
+                const animate = () => {
+                    if (i >= 0) {
+                        const cell = this.solutionPath[i];
+                        this.drawSolution([cell]);  // Draw only the current cell of the solution
+                        i--;
+                        animationFrameId = requestAnimationFrame(animate);
+                    } else {
+                        solving = false;
+                    }
+                };
+
+                animationFrameId = requestAnimationFrame(animate);
+            }
+
+           animateSolving() {
+                let currentPath = [];
+                let visited = Array(this.height).fill(null).map(() => Array(this.width).fill(false));
+                let directions = [{dx: 0, dy: -1, bit: 1}, // N
+                    {dx: 1, dy: 0, bit: 2}, // E
+                    {dx: 0, dy: 1, bit: 4}, // S
+                    {dx: -1, dy: 0, bit: 8}]; // W
+                let x = this.start.x, y = this.start.y;
+                let found = false;
+
+                visited[y][x] = true;
+                currentPath.push({x,y});
+                let index = 0;
+
+                const solveStep = () => {
+
+                    if(x === this.end.x && y === this.end.y){
+                        console.log('Found solution');
+                        this.solutionPath = currentPath;
+                        found = true;
+                        solving = false;
+                        cancelAnimationFrame(animationFrameId);
+                        this.drawSolution(this.solutionPath);
+                        return;
+                    }
+
+
+                    if(index < currentPath.length){
+                        x = currentPath[index].x;
+                        y = currentPath[index].y;
+                        this.drawExplored(x,y);
+
+                        for (let dir of directions) {
+                            let nx = x + dir.dx;
+                            let ny = y + dir.dy;
+
+                            if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height &&
+                                !visited[ny][nx] && !(this.grid[y][x] & dir.bit)) {
+
+                                visited[ny][nx] = true;
+                                currentPath.push({x: nx, y:ny});
+                                break;
+                            }
+                        }
+                        index++;
+
+                        animationFrameId = requestAnimationFrame(solveStep);
+
+
+                    } else {
+                        console.log('No solution');
+                        solving = false;
+                        cancelAnimationFrame(animationFrameId);
+                    }
+                };
+
+
+                solving = true;
+                animationFrameId = requestAnimationFrame(solveStep);
+
+            }
+
+        }
+
+        function handleGenerate() {
+            const width = parseInt(widthInput.value);
+            const height = parseInt(heightInput.value);
+
+            if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+                alert('Please enter valid width and height values.');
+                return;
+            }
+
+            maze = new Maze(width, height);
+            maze.generate();
+            maze.draw();
+            solutionPath = []; // Reset solution path
+            solving = false;
+            cancelAnimationFrame(animationFrameId);
+        }
+
+        function handleSolve() {
+            if (!maze) {
+                alert('Please generate a maze first.');
+                return;
+            }
+
+            if (solving) {
+                return;
+            }
+
+            cancelAnimationFrame(animationFrameId);
+            maze.draw(); // Redraw the maze to clear previous solving attempts
+           // const solved = maze.solve();
+           //
+           //  if (solved) {
+           //      solving = true;
+           //      maze.animateSolution();
+           //  } else {
+           //      alert('No solution found.');
+           //  }
+
+            solving = true;
+            maze.animateSolving();
+        }
+
+        generateButton.addEventListener('click', handleGenerate);
+        solveButton.addEventListener('click', handleSolve);
+    </script>
+</body>
+</html>
