@@ -1,0 +1,270 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="/error-capture.js" data-iframe-id="playground"></script>
+        </head>
+        <body>
+            
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="/error-capture.js" data-iframe-id="playground"></script>
+        </head>
+        <body>
+            <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spectacular Interactive Fireworks</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            /* Add a gradient background */
+            background: linear-gradient(to bottom, #000022, #000055);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 2em;
+            text-align: center;
+            pointer-events: none; /* Allow clicks to pass through */
+            font-family: 'Arial Black', sans-serif; /* Use a more exciting font */
+            text-shadow: 2px 2px 4px #000000; /* Add a text shadow */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="fireworksCanvas"></canvas>
+    <div id="overlay">Click or Press Spacebar to Launch Fireworks!</div>
+
+    <script>
+        // Using object oriented approach and design patterns (Factory and Strategy)
+
+        // 1. Particle Class (Blueprint for individual firework particles)
+        class Particle {
+            constructor(x, y, color, size, velocityX, velocityY, lifespan) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.size = size;
+                this.velocityX = velocityX;
+                this.velocityY = velocityY;
+                this.lifespan = lifespan;
+                this.alpha = 1; // Transparency
+            }
+
+            update() {
+                this.velocityX *= 0.99; // Add a small friction factor
+                this.velocityY += 0.03; // Gravity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+                this.lifespan--;
+                this.alpha = this.lifespan / 100; // Fade out based on lifespan
+            }
+
+            draw(ctx) {
+                ctx.save(); // Save the current drawing state
+                ctx.globalAlpha = this.alpha; // Set transparency
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore(); // Restore the drawing state
+            }
+        }
+
+        // 2. Explosion Strategy Interface
+        class ExplosionStrategy {
+            createParticles(x, y, color, particleCount) {
+                throw new Error("Method 'createParticles()' must be implemented.");
+            }
+        }
+
+        // 3. Concrete Explosion Strategies
+        class BasicExplosionStrategy extends ExplosionStrategy {
+            createParticles(x, y, color, particleCount) {
+                const particles = [];
+                for (let i = 0; i < particleCount; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 3 + 1;
+                    const velocityX = Math.cos(angle) * speed;
+                    const velocityY = Math.sin(angle) * speed;
+                    const size = Math.random() * 2 + 1;
+                    const lifespan = Math.floor(Math.random() * 100 + 50);
+
+                    particles.push(new Particle(x, y, color, size, velocityX, velocityY, lifespan));
+                }
+                return particles;
+            }
+        }
+
+        class StarExplosionStrategy extends ExplosionStrategy {
+            createParticles(x, y, color, particleCount) {
+                const particles = [];
+                const points = 5; // Number of points in the star
+                for (let i = 0; i < particleCount; i++) {
+                    const angle = (i / particleCount) * Math.PI * 2;
+
+                    // Create two points for each star point
+                    const x1 = x + Math.cos(angle) * (Math.random() * 10 + 5); // Outer radius
+                    const y1 = y + Math.sin(angle) * (Math.random() * 10 + 5);
+                    const x2 = x + Math.cos(angle + Math.PI / points) * (Math.random() * 5 + 2); // Inner radius
+                    const y2 = y + Math.sin(angle + Math.PI / points) * (Math.random() * 5 + 2);
+
+                    // Create particles for both points
+                    const speed = Math.random() * 2 + 0.5;
+                    const velocityX1 = Math.cos(angle) * speed;
+                    const velocityY1 = Math.sin(angle) * speed;
+                    const velocityX2 = Math.cos(angle + Math.PI / points) * speed;
+                    const velocityY2 = Math.sin(angle + Math.PI / points) * speed;
+
+                    const size = Math.random() * 1.5 + 0.5;
+                    const lifespan = Math.floor(Math.random() * 80 + 40);
+
+                    particles.push(new Particle(x1, y1, color, size, velocityX1, velocityY1, lifespan));
+                    particles.push(new Particle(x2, y2, color, size, velocityX2, velocityY2, lifespan));
+                }
+                return particles;
+            }
+        }
+
+        class HeartExplosionStrategy extends ExplosionStrategy {
+          createParticles(x, y, color, particleCount) {
+            const particles = [];
+            for (let i = 0; i < particleCount; i++) {
+              const angle = Math.random() * Math.PI * 2;
+              const heartX = 15 * Math.pow(Math.sin(angle), 3);
+              const heartY = - (13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+
+              const speed = Math.random() * 1.5 + 0.5;
+              const velocityX = heartX / 4 * speed;
+              const velocityY = heartY / 4 * speed;
+
+              const size = Math.random() * 1.5 + 0.5;
+              const lifespan = Math.floor(Math.random() * 80 + 40);
+
+              particles.push(new Particle(x + heartX, y + heartY, color, size, velocityX, velocityY, lifespan));
+            }
+            return particles;
+          }
+        }
+
+
+        // 4. Firework Factory
+        class FireworkFactory {
+            constructor(explosionStrategy) {
+                this.explosionStrategy = explosionStrategy;
+            }
+
+            createFirework(x, y, color, particleCount) {
+                return this.explosionStrategy.createParticles(x, y, color, particleCount);
+            }
+
+            setExplosionStrategy(explosionStrategy) {
+                this.explosionStrategy = explosionStrategy;
+            }
+        }
+
+
+        // 5. App Logic
+
+        const canvas = document.getElementById('fireworksCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let fireworks = [];
+
+        // Color palette - make it more vibrant
+        const colors = ['#ff4081', '#448aff', '#00e5ff', '#ffeb3b', '#76ff03', '#f06292'];
+
+        const fireworkFactory = new FireworkFactory(new BasicExplosionStrategy());
+
+        function createFirework(x, y) {
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const particleCount = Math.floor(Math.random() * 100) + 50;
+
+             // Randomly choose between basic, star and heart explosions
+            const explosionType = Math.random() < 0.33 ? 'basic' : (Math.random() < 0.66 ? 'star' : 'heart');
+            if (explosionType === 'basic') {
+                fireworkFactory.setExplosionStrategy(new BasicExplosionStrategy());
+            } else if (explosionType === 'star') {
+                fireworkFactory.setExplosionStrategy(new StarExplosionStrategy());
+            } else {
+                fireworkFactory.setExplosionStrategy(new HeartExplosionStrategy());
+            }
+
+
+            const newFireworks = fireworkFactory.createFirework(x, y, color, particleCount);
+            fireworks = fireworks.concat(newFireworks); // Combine existing and new fireworks
+        }
+
+        function updateFireworks() {
+            for (let i = 0; i < fireworks.length; i++) {
+                fireworks[i].update();
+            }
+
+            // Remove dead particles
+            fireworks = fireworks.filter(particle => particle.lifespan > 0);
+        }
+
+        function drawFireworks() {
+            fireworks.forEach(particle => particle.draw(ctx));
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'; // Add a slight trail effect
+            ctx.fillRect(0, 0, canvas.width, canvas.height);  // Clear the canvas with trail
+            updateFireworks();
+            drawFireworks();
+            requestAnimationFrame(animate);
+        }
+
+        // Event Listeners
+        canvas.addEventListener('click', (e) => {
+            overlay.style.display = 'none'; // Hide overlay on click
+            createFirework(e.clientX, e.clientY);
+        });
+
+        document.addEventListener('keydown', (e) => {
+             overlay.style.display = 'none'; // Hide overlay on keypress
+            if (e.code === 'Space') {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                createFirework(x, y);
+            }
+        });
+
+        // Auto-display (optional)
+        setInterval(() => {
+             if (fireworks.length === 0) {  // prevent too many concurrent auto launched fireworks
+                 const x = Math.random() * canvas.width;
+                 const y = Math.random() * canvas.height / 2; // Launch from the top half
+                 createFirework(x, y);
+             }
+        }, 2000); // Launch a firework every 2 seconds
+
+        animate(); // Start the animation loop
+    </script>
+</body>
+</html>
+        </body>
+        </html>
+    
+        </body>
+        </html>
+    
