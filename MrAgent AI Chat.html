@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MrAgent AI Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.dark-mode {
+            background-color: #222;
+            color: #eee;
+        }
+
+        .container {
+            width: 80%;
+            max-width: 600px;
+            padding: 30px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container.dark-mode {
+            background-color: #333;
+            box-shadow: 0 5px 20px rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #007bff;
+            transition: color 0.3s;
+        }
+
+        .dark-mode h1 {
+            color: #66b3ff;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            transition: color 0.3s;
+        }
+
+        .dark-mode label {
+            color: #ddd;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+            background-color: #f9f9f9;
+            color: #333;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+
+        input[type="text"].dark-mode,
+        textarea.dark-mode,
+        select.dark-mode {
+            background-color: #444;
+            color: #eee;
+            border-color: #555;
+        }
+
+        textarea {
+            height: 150px;
+            resize: vertical;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #response {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background-color: #fff;
+            min-height: 120px;
+            font-size: 16px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+        }
+
+        #response.dark-mode {
+            background-color: #333;
+            border-color: #555;
+            color: #eee;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading i {
+            font-size: 28px;
+            animation: spin 1s linear infinite;
+            color: #007bff;
+        }
+
+        .dark-mode .loading i {
+            color: #66b3ff;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #mode-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        #mode-toggle label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        #lightModeIcon,
+        #darkModeIcon {
+            font-size: 20px;
+            margin: 0 5px;
+            color: #007bff;
+        }
+
+        .dark-mode #lightModeIcon {
+            color: #ddd;
+        }
+
+        .dark-mode #darkModeIcon {
+            color: #66b3ff;
+        }
+
+        #darkModeToggle {
+            display: none;
+        }
+
+        /* Responsive layout */
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            label {
+                font-size: 15px;
+            }
+
+            input[type="text"],
+            textarea,
+            select,
+            button,
+            #response {
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OpenRouter Chat</h1>
+
+        <div id="mode-toggle">
+            <label for="darkModeToggle">
+                <i class="fas fa-sun" id="lightModeIcon"></i>
+                <i class="fas fa-moon" id="darkModeIcon"></i>
+            </label>
+            <input type="checkbox" id="darkModeToggle">
+        </div>
+
+        <label for="apiKey">OpenRouter API Key:</label>
+        <input type="text" id="apiKey" name="apiKey" placeholder="Enter your OpenRouter API key">
+
+        <label for="model">Select Model:</label>
+        <select id="model" name="model">
+            <option value="">Loading models...</option>
+        </select>
+
+        <label for="prompt">Enter your message:</label>
+        <textarea id="prompt" name="prompt" placeholder="Enter your prompt"></textarea>
+
+        <button id="sendButton">Send</button>
+
+        <div class="loading" style="display: none;">
+            <i class="fas fa-spinner fa-spin"></i> Loading...
+        </div>
+
+        <div id="response"></div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            let modelsCache = null;
+            const cacheExpiry = 60 * 1000; // 1 minute
+            let lastFetched = null;
+
+            // Function to fetch models from OpenRouter API
+            function fetchModels() {
+                $("#model").html('<option value="">Loading models...</option>');
+                const apiKey = $("#apiKey").val(); // get API key to send the request successfully
+                if (!apiKey) {
+                    $("#model").html('<option value="">Enter API Key First</option>');
+                    return;
+                }
+
+                $.ajax({
+                    url: "https://openrouter.ai/api/v1/models",
+                    type: "GET",
+                    beforeSend: function(xhr) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
+                    },
+                    success: function(data) {
+                        if (data && data.data && Array.isArray(data.data)) {
+                            modelsCache = data.data;
+                            lastFetched = Date.now();
+                            populateModelsDropdown(data.data);
+                        } else {
+                            $("#model").html('<option value="">Error loading models</option>');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error fetching models:", error);
+                        $("#model").html('<option value="">Error loading models</option>');
+                    }
+                });
+            }
+
+            function populateModelsDropdown(models) {
+                $("#model").empty();
+                $.each(models, function(i, model) {
+                    $("#model").append($('<option>', {
+                        value: model.id,
+                        text : model.id
+                    }));
+                });
+            }
+
+            // Initially fetch models and also fetch on apiKey input
+            $("#apiKey").on('input',function(){
+                if (modelsCache == null || lastFetched == null || (Date.now() - lastFetched) > cacheExpiry) {
+                fetchModels();
+                } else {
+                    populateModelsDropdown(modelsCache);
+                }
+            })
+            if (modelsCache == null || lastFetched == null || (Date.now() - lastFetched) > cacheExpiry) {
+                fetchModels();
+            } else {
+                populateModelsDropdown(modelsCache);
+            }
+
+
+            // Send message to OpenRouter API
+            $("#sendButton").click(function() {
+                const apiKey = $("#apiKey").val();
+                const model = $("#model").val();
+                const prompt = $("#prompt").val();
+
+                if (!apiKey || !model || !prompt) {
+                    alert("Please fill in all fields.");
+                    return;
+                }
+
+                $(".loading").show();
+                $("#response").empty();
+
+
+                $.ajax({
+                    url: "https://openrouter.ai/api/v1/chat/completions",
+                    type: "POST",
+                    contentType: "application/json",
+                    headers: {
+                        "Authorization": `Bearer ${apiKey}`,
+                        "Content-Type": "application/json"
+                    },
+                    data: JSON.stringify({
+                        model: model,
+                        messages: [{ role: "user", content: prompt }],
+                        stream: false
+                    }),
+                    success: function(data) {
+                        $(".loading").hide();
+                        $("#response").text(data.choices[0].message.content);
+                    },
+                    error: function(xhr, status, error) {
+                        $(".loading").hide();
+                        $("#response").text("Error: " + error + ". Status: " + xhr.status + " - " + xhr.responseText);
+                    }
+                });
+            });
+
+            // Dark/Light Mode Toggle
+            $('#darkModeToggle').change(function() {
+                $('body').toggleClass('dark-mode');
+                $('.container').toggleClass('dark-mode');
+                $('input[type="text"]').toggleClass('dark-mode');
+                $('textarea').toggleClass('dark-mode');
+                $('select').toggleClass('dark-mode');
+                $('#response').toggleClass('dark-mode');
+            });
+        });
+    </script>
+</body>
+</html>
