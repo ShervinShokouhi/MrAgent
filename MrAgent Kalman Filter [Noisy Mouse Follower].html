@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kalman Filter Mouse Prediction</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f7f7f7;
+        }
+
+        h1 {
+            color: #333;
+            text-shadow: 3px 3px 5px rgba(0, 0, 0, 0.3); /* Enhanced 3D shadow */
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3); /* Stronger 3D shadow effect */
+            border: 1px solid #eee; /* subtle border */
+            margin-bottom: 20px; /* Added margin for better spacing */
+        }
+
+        #controls {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+            width: 80%;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .input-group label {
+            margin-right: 10px;
+            width: 150px;
+            text-align: right;
+            color: #555;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); /* Added text shadow */
+        }
+
+        input[type="number"],
+        input[type="range"] {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); /* Enhanced input shadow */
+        }
+
+        #canvas {
+            border: 1px solid #ccc;
+            box-shadow: 4px 4px 6px rgba(0, 0, 0, 0.4); /* Enhanced canvas shadow */
+        }
+
+        .matrix-row {
+            display: flex;
+        }
+
+        .matrix-item {
+            padding: 5px;
+            border: 1px solid #eee;
+            cursor: pointer;
+            background-color: #fff;
+            transition: background-color 0.3s ease;
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); /* Matrix item shadow */
+        }
+        .matrix-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .matrix-container {
+            margin-bottom: 10px;
+        }
+
+        #matrix-inputs {
+            display: flex;
+            justify-content: space-around; /* Distribute items evenly */
+            width: 100%; /* Take full width to ensure even distribution */
+            margin-bottom: 20px; /* Added margin for better spacing */
+        }
+
+        .matrix-input-container {
+            width: 20%; /* Adjust as needed, considering spacing */
+            text-align: center; /* Center the matrix within its container */
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+            box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.4); /* Button shadow */
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Modal content shadow */
+        }
+
+        /* Canvas Container */
+        #canvas-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Container shadow */
+            border-radius: 10px;
+            overflow: hidden; /* Hide any overflow from the canvas */
+        }
+    </style>
+</head>
+<body>
+    <h1>Kalman Filter Mouse Prediction</h1>
+    <div id="app"></div>
+
+    <script type="text/babel">
+        function KalmanFilterSimulator() {
+            const [mousePosition, setMousePosition] = React.useState({ x: 0, y: 0 });
+            const [predictedPosition, setPredictedPosition] = React.useState({ x: 0, y: 0 });
+            const [processNoise, setProcessNoise] = React.useState(0.1);
+            const [measurementNoise, setMeasurementNoise] = React.useState(25);
+            const [dotCount, setDotCount] = React.useState(50);
+            const [kalmanState, setKalmanState] = React.useState({
+                x: 0,
+                y: 0,
+                vx: 0,
+                vy: 0,
+                P: [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]] // Initial covariance matrix
+            });
+            const canvasRef = React.useRef(null);
+            const [noisyData, setNoisyData] = React.useState([]);
+            const [mousePositions, setMousePositions] = React.useState([]);
+            const [kalmanPositions, setKalmanPositions] = React.useState([]);
+
+            // Kalman Parameter States
+            const [F, setF] = React.useState([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]]);
+            const [H, setH] = React.useState([[1, 0, 0, 0], [0, 1, 0, 0]]);
+            const [Q, setQ] = React.useState([[processNoise, 0, 0, 0], [0, processNoise, 0, 0], [0, 0, processNoise, 0], [0, 0, 0, processNoise]]);
+            const [R, setR] = React.useState([[measurementNoise, 0], [0, measurementNoise]]);
+
+            const [selectedMatrix, setSelectedMatrix] = React.useState(null);
+            const [selectedRow, setSelectedRow] = React.useState(null);
+            const [selectedCol, setSelectedCol] = React.useState(null);
+            const [inputValue, setInputValue] = React.useState("");
+            const [isModalOpen, setIsModalOpen] = React.useState(false);
+
+
+            const handleMouseMove = (event) => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                setMousePosition({ x: x, y: y });
+
+                generateNoisyData(x, y);
+                updateKalmanFilter();
+                setMousePositions(prevPositions => [...prevPositions, { x: x, y: y }]);
+            };
+
+            React.useEffect(() => {
+                generateInitialNoisyData();
+            }, []);
+
+            const generateInitialNoisyData = () => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = rect.width / 2; // Center X
+                const y = rect.height / 2; // Center Y
+                generateNoisyData(x, y);
+
+            };
+
+
+
+            const generateNoisyData = (x, y) => {
+                const newData = [];
+                for (let i = 0; i < dotCount; i++) {
+                    newData.push({
+                        x: x + (Math.random() - 0.5) * measurementNoise * 2,
+                        y: y + (Math.random() - 0.5) * measurementNoise * 2,
+                    });
+                }
+                setNoisyData(newData);
+            };
+
+            const kalmanFilter = (measurement, state, processNoise, measurementNoise) => {
+                // State transition matrix (assuming constant velocity model)
+                const F_local = F;
+
+                // Measurement matrix (only measuring position)
+                const H_local = H;
+
+                // Process noise covariance matrix
+                const Q_local = Q;
+
+                // Measurement noise covariance matrix
+                const R_local = R;
+
+                // Prediction step
+                let x = [state.x, state.y, state.vx, state.vy];
+                let P = state.P;
+
+                // x = F * x
+                x = [
+                  F_local[0][0] * state.x + F_local[0][1] * state.y + F_local[0][2] * state.vx + F_local[0][3] * state.vy,
+                  F_local[1][0] * state.x + F_local[1][1] * state.y + F_local[1][2] * state.vx + F_local[1][3] * state.vy,
+                  F_local[2][0] * state.x + F_local[2][1] * state.y + F_local[2][2] * state.vx + F_local[2][3] * state.vy,
+                  F_local[3][0] * state.x + F_local[3][1] * state.y + F_local[3][2] * state.vx + F_local[3][3] * state.vy
+                ];
+
+                // P = F * P * F.transpose() + Q
+                let F_transpose = [[F_local[0][0], F_local[1][0], F_local[2][0], F_local[3][0]],
+                                   [F_local[0][1], F_local[1][1], F_local[2][1], F_local[3][1]],
+                                   [F_local[0][2], F_local[1][2], F_local[2][2], F_local[3][2]],
+                                   [F_local[0][3], F_local[1][3], F_local[2][3], F_local[3][3]]];
+
+                let FP = [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]];
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        for (let k = 0; k < 4; k++) {
+                           FP[i][j] += F_local[i][k] * P[k][j];
+                        }
+                    }
+                }
+
+                let FPFt = [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]];
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        for (let k = 0; k < 4; k++) {
+                           FPFt[i][j] += FP[i][k] * F_transpose[k][j];
+                        }
+                    }
+                }
+
+                let newP = [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]];
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                       newP[i][j] = FPFt[i][j] + Q_local[i][j];
+                    }
+                }
+
+                P = newP;
+
+
+                // Update step
+                // y = z - H * x (z is measurement)
+                let z = measurement;
+                let Hx = [H_local[0][0] * x[0] + H_local[0][1] * x[1] + H_local[0][2] * x[2] + H_local[0][3] * x[3],
+                          H_local[1][0] * x[0] + H_local[1][1] * x[1] + H_local[0][2] * x[2] + H_local[1][3] * x[3]];
+
+                let y = [z.x - Hx[0], z.y - Hx[1]];
+
+
+                // S = H * P * H.transpose() + R
+                let HP = [[0,0,0,0], [0,0,0,0]];
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        for (let k = 0; k < 4; k++) {
+                           HP[i][j] += H_local[i][k] * P[k][j];
+                        }
+                    }
+                }
+
+
+                let H_transpose = [[H_local[0][0], H_local[1][0]], [H_local[0][1], H_local[1][1]], [H_local[0][2], H_local[1][2]], [H_local[0][3], H_local[1][3]]];
+                let HPHt = [[0,0], [0,0]];
+
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 2; j++) {
+                        for (let k = 0; k < 4; k++) {
+                           HPHt[i][j] += HP[i][k] * H_transpose[k][j];
+                        }
+                    }
+                }
+
+                let S = [[0,0], [0,0]];
+                for (let i = 0; i < 2; i++) {
+                    for (let j = 0; j < 2; j++) {
+                       S[i][j] = HPHt[i][j] + R_local[i][j];
+                    }
+                }
+
+
+                // K = P * H.transpose() * S.inverse()
+
+                let PHt = [[0,0], [0,0], [0,0], [0,0]];
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 2; j++) {
+                        for (let k = 0; k < 4; k++) {
+                           PHt[i][j] += P[i][k] * H_transpose[k][j];
+                        }
+                    }
+                }
+
+                let det_S = S[0][0] * S[1][1] - S[0][1] * S[1][0];
+                let S_inverse = [[S[1][1] / det_S, -S[0][1] / det_S],
+                                 [-S[1][0] / det_S, S[0][0] / det_S]];
+
+                let K = [[0,0], [0,0], [0,0], [0,0]];
+
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 2; j++) {
+                        for (let k = 0; k < 2; k++) {
+                           K[i][j] += PHt[i][k] * S_inverse[k][j];
+                        }
+                    }
+                }
+
+                // x = x + K * y
+                x = [x[0] + K[0][0] * y[0] + K[0][1] * y[1],
+                     x[1] + K[1][0] * y[0] + K[1][1] * y[1],
+                     x[2] + K[2][0] * y[0] + K[2][1] * y[1],
+                     x[3] + K[3][0] * y[0] + K[3][1] * y[1]];
+
+
+                // P = (I - K * H) * P
+                let KH = [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]];
+
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        for (let k = 0; k < 2; k++) {
+                           KH[i][j] += K[i][k] * H_local[k][j];
+                        }
+                    }
+                }
+
+
+                let I_KH = [[1 - KH[0][0], 0 - KH[0][1], 0 - KH[0][2], 0 - KH[0][3]],
+                            [0 - KH[1][0], 1 - KH[1][1], 0 - KH[1][2], 0 - KH[1][3]],
+                            [0 - KH[2][0], 0 - KH[2][1], 1 - KH[2][2], 0 - KH[2][3]],
+                            [0 - KH[3][0], 0 - KH[3][1], 0 - KH[3][2], 1 - KH[3][3]]];
+
+                let newPAfterUpdate = [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]];
+
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        for (let k = 0; k < 4; k++) {
+                           newPAfterUpdate[i][j] += I_KH[i][k] * P[k][j];
+                        }
+                    }
+                }
+                P = newPAfterUpdate;
+
+
+                return {
+                    x: x[0],
+                    y: x[1],
+                    vx: x[2],
+                    vy: x[3],
+                    P: P
+                };
+            };
+
+
+
+
+            const updateKalmanFilter = () => {
+                 if (noisyData.length > 0) {
+                    // Select a random noisy data point as the measurement
+                    const randomIndex = Math.floor(Math.random() * noisyData.length);
+                    const measurement = noisyData[randomIndex];
+                    const newState = kalmanFilter(measurement, kalmanState, processNoise, measurementNoise);
+                    setKalmanState(newState);
+                    setPredictedPosition({ x: newState.x, y: newState.y });
+                    setKalmanPositions(prevPositions => [...prevPositions, { x: newState.x, y: newState.y }]);
+                }
+            };
+
+            const handleProcessNoiseChange = (event) => {
+                setProcessNoise(parseFloat(event.target.value));
+            };
+
+            const handleMeasurementNoiseChange = (event) => {
+                setMeasurementNoise(parseFloat(event.target.value));
+            };
+
+            const handleDotCountChange = (event) => {
+                setDotCount(parseInt(event.target.value));
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = rect.width / 2; // Center X
+                const y = rect.height / 2; // Center Y
+                generateNoisyData(x, y);
+            };
+
+            const handleReset = () => {
+                setKalmanState({
+                    x: 0,
+                    y: 0,
+                    vx: 0,
+                    vy: 0,
+                    P: [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+                });
+                setPredictedPosition({ x: 0, y: 0 });
+                setNoisyData([]);
+                setMousePositions([]);
+                setKalmanPositions([]);
+
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                generateInitialNoisyData();
+            };
+
+            const handleMatrixItemClick = (matrixName, row, col) => {
+                setSelectedMatrix(matrixName);
+                setSelectedRow(row);
+                setSelectedCol(col);
+                setInputValue("");
+                setIsModalOpen(true);
+            };
+
+            const handleInputChange = (event) => {
+                setInputValue(event.target.value);
+            };
+
+            const handleSaveValue = () => {
+                const newValue = parseFloat(inputValue);
+                if (!isNaN(newValue)) {
+                    switch (selectedMatrix) {
+                        case 'F':
+                            const newF = F.map((r, i) => r.map((c, j) => (i === selectedRow && j === selectedCol) ? newValue : c));
+                            setF(newF);
+                            break;
+                        case 'H':
+                            const newH = H.map((r, i) => r.map((c, j) => (i === selectedRow && j === selectedCol) ? newValue : c));
+                            setH(newH);
+                            break;
+                        case 'Q':
+                            const newQ = Q.map((r, i) => r.map((c, j) => (i === selectedRow && j === selectedCol) ? newValue : c));
+                            setQ(newQ);
+                            break;
+                        case 'R':
+                            const newR = R.map((r, i) => r.map((c, j) => (i === selectedRow && j === selectedCol) ? newValue : c));
+                            setR(newR);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                setIsModalOpen(false);
+            };
+
+            const handleCloseModal = () => {
+                setIsModalOpen(false);
+            };
+
+
+            React.useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+
+                canvas.width = 800;
+                canvas.height = 600;
+
+                const draw = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw real position (blue)
+                    ctx.fillStyle = 'blue';
+                    ctx.globalAlpha = 0.5; // 50% transparency
+                    ctx.beginPath();
+                    ctx.arc(mousePosition.x, mousePosition.y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.globalAlpha = 1; // Reset transparency
+
+
+                    // Draw line connecting previous mouse positions
+                    ctx.strokeStyle = 'blue';
+                    ctx.globalAlpha = 0.5;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+
+                    if (mousePositions.length > 1) {
+                        ctx.moveTo(mousePositions[0].x, mousePositions[0].y);
+                        for (let i = 1; i < mousePositions.length; i++) {
+                            ctx.lineTo(mousePositions[i].x, mousePositions[i].y);
+                        }
+                    }
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+
+                    // Draw predicted position (Kalman output in red)
+                     ctx.fillStyle = 'red';
+                     ctx.globalAlpha = 0.5; // 50% transparency
+                    ctx.beginPath();
+                    ctx.arc(predictedPosition.x, predictedPosition.y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.globalAlpha = 1; // Reset transparency
+
+                    // Draw line connecting previous kalman positions
+                    ctx.strokeStyle = 'red';
+                     ctx.globalAlpha = 0.5; // 50% transparency
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    if (kalmanPositions.length > 0) {
+                        ctx.moveTo(kalmanPositions[0].x, kalmanPositions[0].y);
+                        for (let i = 1; i < kalmanPositions.length; i++) {
+                            ctx.lineTo(kalmanPositions[i].x, kalmanPositions[i].y);
+                        }
+                    }
+                    ctx.stroke();
+                    ctx.globalAlpha = 1; // Reset transparency
+
+                      // Draw random dots
+                    ctx.fillStyle = 'gray';
+                    noisyData.forEach(dot => {
+                        ctx.beginPath();
+                        ctx.arc(dot.x, dot.y, 2, 0, 2 * Math.PI);
+                        ctx.fill();
+                    });
+
+
+
+                    // Optionally draw covariance ellipse - omitting for brevity, implementation complex
+                    requestAnimationFrame(draw);
+                };
+
+                draw();
+
+            }, [mousePosition, predictedPosition, processNoise, measurementNoise, dotCount, kalmanState, noisyData, kalmanPositions, F, H, Q, R, mousePositions]);
+
+
+            return (
+                <div>
+                    <div id="controls">
+                        <div className="input-group">
+                            <label htmlFor="processNoise">Process Noise:</label>
+                            <input type="number" id="processNoise" value={processNoise} onChange={handleProcessNoiseChange} />
+                        </div>
+                        <div className="input-group">
+                            <label htmlFor="measurementNoise">Measurement Noise:</label>
+                            <input type="number" id="measurementNoise" value={measurementNoise} onChange={handleMeasurementNoiseChange} />
+                        </div>
+                        <div className="input-group">
+                            <label htmlFor="dotCount">Dot Count:</label>
+                            <input type="range" id="dotCount" min="1" max="200" value={dotCount} onChange={handleDotCountChange} />
+                            <span>{dotCount}</span>
+                        </div>
+
+                        <div id="matrix-inputs">
+                            {/* F Matrix Input */}
+                            <div className="matrix-input-container">
+                                <h3>F Matrix</h3>
+                                <div className="matrix-container">
+                                    {F.map((row, i) => (
+                                        <div key={`F_row_${i}`} className="matrix-row">
+                                            {row.map((col, j) => (
+                                                <div
+                                                    key={`F_${i}_${j}`}
+                                                    className="matrix-item"
+                                                    onClick={() => handleMatrixItemClick('F', i, j)}
+                                                >
+                                                    {col}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* H Matrix Input */}
+                            <div className="matrix-input-container">
+                                <h3>H Matrix</h3>
+                                <div className="matrix-container">
+                                    {H.map((row, i) => (
+                                        <div key={`H_row_${i}`} className="matrix-row">
+                                            {row.map((col, j) => (
+                                                <div
+                                                    key={`H_${i}_${j}`}
+                                                    className="matrix-item"
+                                                    onClick={() => handleMatrixItemClick('H', i, j)}
+                                                >
+                                                    {col}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Q Matrix Input */}
+                            <div className="matrix-input-container">
+                                <h3>Q Matrix</h3>
+                                <div className="matrix-container">
+                                    {Q.map((row, i) => (
+                                        <div key={`Q_row_${i}`} className="matrix-row">
+                                            {row.map((col, j) => (
+                                                <div
+                                                    key={`Q_${i}_${j}`}
+                                                    className="matrix-item"
+                                                    onClick={() => handleMatrixItemClick('Q', i, j)}
+                                                >
+                                                    {col}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* R Matrix Input */}
+                            <div className="matrix-input-container">
+                                <h3>R Matrix</h3>
+                                <div className="matrix-container">
+                                    {R.map((row, i) => (
+                                        <div key={`R_row_${i}`} className="matrix-row">
+                                            {row.map((col, j) => (
+                                                <div
+                                                    key={`R_${i}_${j}`}
+                                                    className="matrix-item"
+                                                    onClick={() => handleMatrixItemClick('R', i, j)}
+                                                >
+                                                    {col}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onClick={handleReset}>Reset</button>
+                    </div>
+                     {isModalOpen && (
+                        <div className="modal">
+                            <div className="modal-content">
+                                <label>Enter new value:</label>
+                                <input type="number" value={inputValue} onChange={handleInputChange} />
+                                <button onClick={handleSaveValue}>Save</button>
+                                <button onClick={handleCloseModal}>Cancel</button>
+                            </div>
+                        </div>
+                    )}
+                     <div id="canvas-container">
+                        <canvas id="canvas" ref={canvasRef} onMouseMove={handleMouseMove}></canvas>
+                    </div>
+                    <p><b>Legend:</b> Blue - Real Position, Red - Predicted Position (Kalman), Gray - Random Dots</p>
+
+                </div>
+            );
+        }
+
+        const app = document.getElementById('app');
+        const root = ReactDOM.createRoot(app);
+        root.render(React.createElement(KalmanFilterSimulator));
+    </script>
+</body>
+</html>
